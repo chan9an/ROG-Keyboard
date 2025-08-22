@@ -1,0 +1,15 @@
+[package]
+name = "strixsense"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Tokio is needed to run async functions
+tokio = { version = "1", features = ["full"] }
+
+# The library for the data types (AuraEffect, Colour, etc.)
+rog_aura = { git = "https://gitlab.com/asus-linux/asusctl.git", package = "rog_aura", features = ["dbus"] }
+# The library that contains the actual DBus proxy code.
+rog_dbus = { git = "https://gitlab.com/asus-linux/asusctl.git", package = "rog_dbus" }
+# The library for D-Bus communication.
+zbus = "5.9.0"
