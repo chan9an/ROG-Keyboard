@@ -1,19 +1,5 @@
-/*
-    File: Cargo.toml
-    Purpose: Defines the project's dependencies.
-*/
 
-
-
-/*
-    File: src/main.rs
-    Purpose: The main application logic with integrated RGB control.
-*/
-
-// Import Tokio's async versions of process and io utilities
-use tokio::process::Command;
-use tokio::io::{BufReader, AsyncBufReadExt};
-use std::process::Stdio;
+use tokio::time::{sleep, Duration};
 
 // Import the necessary components from the correct crates.
 use rog_aura::{AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed};
@@ -25,64 +11,45 @@ use zbus::{Connection, fdo::ObjectManagerProxy};
 // By using `#[tokio::main]`, we set up the async runtime.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting StrixSense listener...");
+    println!("Starting StrixSense light test...");
 
     println!("--> Connecting to system D-Bus...");
     let connection = Connection::system().await?;
 
     println!("--> Finding Aura hardware service dynamically...");
     let aura = find_aura_proxy(&connection).await?;
-    println!("--> Connection successful. Monitoring system journal for Bluetooth events.");
+    println!("--> Connection successful. Now testing light control.");
 
-    let mut cmd = Command::new("journalctl")
-        .arg("-u")
-        .arg("bluetooth.service")
-        .arg("-f")
-        .arg("-n")
-        .arg("0")
-        .stdout(Stdio::piped())
-        .spawn()?;
+    // --- TEST 1: SET TO GREEN ---
+    println!("    -> Setting keyboard to STATIC GREEN");
+    let green_effect = AuraEffect {
+        mode: AuraModeNum::Static,
+        zone: AuraZone::None,
+        colour1: Colour { r: 0, g: 255, b: 0 },
+        colour2: Colour { r: 0, g: 0, b: 0 },
+        speed: Speed::Med,
+        direction: Direction::Right,
+    };
+    aura.set_led_mode_data(green_effect).await?;
+    println!("    -> Keyboard color set to STATIC GREEN!");
 
-    let stdout = cmd.stdout.take().expect("Failed to capture stdout");
-    let mut reader = BufReader::new(stdout).lines();
+    // Wait for 3 seconds to see the color change
+    sleep(Duration::from_secs(3)).await;
 
-    while let Some(line) = reader.next_line().await? {
-        if line.contains("ready") && line.contains(": fd(") {
-            println!("[+] DEVICE CONNECTED (Detected via journal log)");
-            println!("    -> Setting keyboard to STATIC GREEN");
+    // --- TEST 2: SET TO RED ---
+    println!("    -> Setting keyboard to STATIC RED");
+    let red_effect = AuraEffect {
+        mode: AuraModeNum::Static,
+        zone: AuraZone::None,
+        colour1: Colour { r: 255, g: 0, b: 0 },
+        colour2: Colour { r: 0, g: 0, b: 0 },
+        speed: Speed::Med,
+        direction: Direction::Right,
+    };
+    aura.set_led_mode_data(red_effect).await?;
+    println!("    -> Keyboard color set to STATIC RED!");
 
-            // --- LIGHTING CODE ---
-            // Set the mode to Static.
-            let green_effect = AuraEffect {
-                mode: AuraModeNum::Static,
-                zone: AuraZone::None,
-                colour1: Colour { r: 0, g: 255, b: 0 },
-                colour2: Colour { r: 0, g: 0, b: 0 },
-                speed: Speed::Med,
-                direction: Direction::Right,
-            };
-            aura.set_led_mode_data(green_effect).await?;
-            println!("    -> Keyboard color set to STATIC GREEN!");
-
-
-        } else if line.contains("device_disconnected") {
-            println!("[-] DEVICE DISCONNECTED (Detected via journal log)");
-            println!("    -> Setting keyboard to STATIC RED");
-
-            // --- LIGHTING CODE ---
-            // Set the mode to Static and the color to Red.
-            let red_effect = AuraEffect {
-                mode: AuraModeNum::Static,
-                zone: AuraZone::None,
-                colour1: Colour { r: 255, g: 0, b: 0 },
-                colour2: Colour { r: 0, g: 0, b: 0 },
-                speed: Speed::Med,
-                direction: Direction::Right,
-            };
-            aura.set_led_mode_data(red_effect).await?;
-            println!("    -> Keyboard color set to STATIC RED!");
-        }
-    }
+    println!("--> Test complete.");
 
     Ok(())
 }
