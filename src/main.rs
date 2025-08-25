@@ -1,4 +1,5 @@
 
+
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -42,16 +43,16 @@ fn monitor_bluetooth() -> Result<(), Box<dyn std::error::Error>> {
         let text = line?;
         if text.contains("Connected: yes") {
             println!("[+] BLUETOOTH DEVICE CONNECTED");
-            // Breathe green for 3 seconds, then return to default blue
-            set_keyboard_breathe("00ff00")?; // Green
+            // Breathe a vibrant lime green, then return to default indigo
+            set_keyboard_breathe("32CD32")?; // Lime Green
             thread::sleep(Duration::from_secs(3));
-            set_keyboard_static("0000ff")?; // Blue
+            set_keyboard_static("4B0082")?; // Indigo
         } else if text.contains("Connected: no") {
             println!("[-] BLUETOOTH DEVICE DISCONNECTED");
-            // Breathe red for 3 seconds, then return to default blue
-            set_keyboard_breathe("ff0000")?; // Red
+            // Breathe a deep red, then return to default indigo
+            set_keyboard_breathe("8B0000")?; // Deep Red
             thread::sleep(Duration::from_secs(3));
-            set_keyboard_static("0000ff")?; // Blue
+            set_keyboard_static("4B0082")?; // Indigo
         }
     }
     Ok(())
@@ -69,18 +70,19 @@ fn monitor_wifi() -> Result<(), Box<dyn std::error::Error>> {
 
     for line in reader.lines() {
         let text = line?;
+        // Use more specific keywords based on your logs for better accuracy.
         if text.contains("' is now the primary connection") {
             println!("[+] WIFI CONNECTED");
-            // Breathe a bright cyan color, then return to default blue
-            set_keyboard_breathe("00FFFF")?; // Cyan
+            // Breathe a cool sky blue, then return to default indigo
+            set_keyboard_breathe("87CEEB")?; // Sky Blue
             thread::sleep(Duration::from_secs(3));
-            set_keyboard_static("0000ff")?; // Blue
+            set_keyboard_static("4B0082")?; // Indigo
         } else if text.contains("There's no primary connection") {
             println!("[-] WIFI DISCONNECTED");
-            // Breathe a warning orange color, then return to default blue
-            set_keyboard_breathe("FFA500")?; // Orange
+            // Breathe a warning gold color, then return to default indigo
+            set_keyboard_breathe("FFD700")?; // Gold
             thread::sleep(Duration::from_secs(3));
-            set_keyboard_static("0000ff")?; // Blue
+            set_keyboard_static("4B0082")?; // Indigo
         }
     }
     Ok(())
@@ -90,8 +92,6 @@ fn monitor_wifi() -> Result<(), Box<dyn std::error::Error>> {
 fn set_keyboard_breathe(color_hex: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("    -> Setting keyboard to BREATHE with color #{}", color_hex);
 
-    // Execute `asusctl aura breathe -c <color> -C 000000 -s high`
-    // This will breathe from the specified color to black at a high speed.
     let output = Command::new("asusctl")
         .arg("aura")
         .arg("breathe")
@@ -118,6 +118,7 @@ fn set_keyboard_breathe(color_hex: &str) -> Result<(), Box<dyn std::error::Error
 fn set_keyboard_static(color_hex: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("    -> Setting keyboard to STATIC with color #{}", color_hex);
 
+    // FIX: Added the '-c' flag to the static command.
     let output = Command::new("asusctl")
         .arg("aura")
         .arg("static")
