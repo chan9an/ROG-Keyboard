@@ -1,70 +1,92 @@
 
-use tokio::time::{sleep, Duration};
+/*
+    File: src/main.rs
+    Purpose: The complete program that listens for Bluetooth events and
+             controls the keyboard lights by executing system commands.
+*/
 
-// Import the necessary components from the correct crates.
-use rog_aura::{AuraEffect, AuraModeNum, AuraZone, Colour, Direction, Speed};
-use rog_dbus::zbus_aura::AuraProxy;
-// Import the zbus Connection struct and the ObjectManagerProxy for discovery
-use zbus::{Connection, fdo::ObjectManagerProxy};
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use std::thread::sleep;
+use std::time::Duration;
 
+/// Main function that sets up the listener and controls the lights.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Starting StrixSense Listener...");
+    println!("--> Monitoring bluetoothctl for events.");
 
-// By using `#[tokio::main]`, we set up the async runtime.
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting StrixSense light test...");
+    // Spawn the `bluetoothctl` command, which gives us clear, reliable output.
+    let mut cmd = Command::new("bluetoothctl")
+        .stdout(Stdio::piped())
+        .spawn()?;
 
-    println!("--> Connecting to system D-Bus...");
-    let connection = Connection::system().await?;
+    // Get a handle to the command's output stream.
+    let stdout = cmd.stdout.take().expect("Failed to capture stdout from bluetoothctl");
+    let reader = BufReader::new(stdout);
 
-    println!("--> Finding Aura hardware service dynamically...");
-    let aura = find_aura_proxy(&connection).await?;
-    println!("--> Connection successful. Now testing light control.");
-
-    // --- TEST 1: SET TO GREEN ---
-    println!("    -> Setting keyboard to STATIC GREEN");
-    let green_effect = AuraEffect {
-        mode: AuraModeNum::Static,
-        zone: AuraZone::None,
-        colour1: Colour { r: 0, g: 255, b: 0 },
-        colour2: Colour { r: 0, g: 0, b: 0 },
-        speed: Speed::Med,
-        direction: Direction::Right,
-    };
-    aura.set_led_mode_data(green_effect).await?;
-    println!("    -> Keyboard color set to STATIC GREEN!");
-
-    // Wait for 3 seconds to see the color change
-    sleep(Duration::from_secs(3)).await;
-
-    // --- TEST 2: SET TO RED ---
-    println!("    -> Setting keyboard to STATIC RED");
-    let red_effect = AuraEffect {
-        mode: AuraModeNum::Static,
-        zone: AuraZone::None,
-        colour1: Colour { r: 255, g: 0, b: 0 },
-        colour2: Colour { r: 0, g: 0, b: 0 },
-        speed: Speed::Med,
-        direction: Direction::Right,
-    };
-    aura.set_led_mode_data(red_effect).await?;
-    println!("    -> Keyboard color set to STATIC RED!");
-
-    println!("--> Test complete.");
+    // Loop forever, reading each new line from the log.
+    for line in reader.lines() {
+        let text = line?;
+        
+        // Check for the definitive keywords from the bluetoothctl output.
+        if text.contains("Connected: yes") {
+            println!("[+] DEVICE CONNECTED");
+            // Pulse green for 1 second as a notification
+            set_keyboard_pulse("00ff00")?;
+            sleep(Duration::from_secs(1));
+            // Then return to a default static blue color
+            set_keyboard_static("0000ff")?;
+        } else if text.contains("Connected: no") {
+            println!("[-] DEVICE DISCONNECTED");
+            // Pulse red for 1 second as a notification
+            set_keyboard_pulse("ff0000")?;
+            sleep(Duration::from_secs(1));
+            // Then return to a default static blue color
+            set_keyboard_static("002FFF")?;
+        }
+    }
 
     Ok(())
 }
 
-/// This function dynamically finds the correct D-Bus path for the Aura service.
-async fn find_aura_proxy<'a>(connection: &'a Connection) -> Result<AuraProxy<'a>, Box<dyn std::error::Error>> {
-    let manager = ObjectManagerProxy::new(connection, "xyz.ljones.Asusd", "/").await?;
-    let objects = manager.get_managed_objects().await?;
+/// A helper function to set a PULSE effect by calling the `asusctl` command.
+fn set_keyboard_pulse(color_hex: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("    -> Setting keyboard to PULSE with color #{}", color_hex);
 
-    for (path, interfaces) in objects {
-        if interfaces.contains_key("xyz.ljones.Aura") {
-            println!("    -> Found Aura interface at path: {}", path);
-            return Ok(AuraProxy::builder(connection).path(path)?.build().await?);
-        }
+    let output = Command::new("asusctl")
+        .arg("aura")
+        .arg("pulse")
+        .arg("-c")
+        .arg(color_hex)
+        .output()?;
+
+    if !output.status.success() {
+        let error_message = String::from_utf8_lossy(&output.stderr);
+        eprintln!("    -> Error from asusctl: {}", error_message);
+    } else {
+        println!("    -> Pulse effect activated!");
     }
 
-    Err("Could not find any object with the 'xyz.ljones.Aura' interface.".into())
+    Ok(())
+}
+
+/// A helper function to set a STATIC color by calling the `asusctl` command.
+fn set_keyboard_static(color_hex: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("    -> Setting keyboard to STATIC with color #{}", color_hex);
+
+    let output = Command::new("asusctl")
+        .arg("aura")
+        .arg("static")
+        .arg("-c")
+        .arg(color_hex)
+        .output()?;
+
+    if !output.status.success() {
+        let error_message = String::from_utf8_lossy(&output.stderr);
+        eprintln!("    -> Error from asusctl: {}", error_message);
+    } else {
+        println!("    -> Static color set!");
+    }
+
+    Ok(())
 }
