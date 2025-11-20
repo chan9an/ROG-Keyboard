@@ -1,6 +1,3 @@
-Here is the complete, detailed README file incorporating the original system monitoring features and the ambitious new developer feedback system plan.
-
------
 
 # StrixSense Listener
 
